@@ -10,7 +10,7 @@ apptainer pull docker://hepstore/rivet-pythia:main
 Command to run the container:
 
 ```bash
-apptainer exec -B /gpfs01 rivet-pythia.sif bash
+apptainer exec -B /gpfs01 rivet-pythia_main.sif bash
 ```
 
 ## Compile + Local Run
@@ -36,6 +36,6 @@ Parameters can be tuned in `makeTree.cc`
 ```
 - It will submit jobs using definied ptHat bins in `submit/ptHatBins.list`
 - The output will be stored in `submit/output/`
-- After jobs are done, the script will merge trees (Histogram `stats` contain `cross section` and `nEvents`, which are additive)
+- After jobs are done, the script will merge trees (Histogram `stats` contains `cross section` and `nEvents`, which are additive)
 - And execute analysis macro `anaTrees/anaTrees.cpp+`
 
