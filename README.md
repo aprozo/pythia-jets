@@ -4,13 +4,13 @@
 Easiest way to get the environment is via Apptainer (Singularity) container:
 
 ```bash
-apptainer pull docker://hepstore/rivet-pythia:main
+apptainer pull rivet-pythia.sif docker://hepstore/rivet-pythia:main
 ```
 
 Command to run the container:
 
 ```bash
-apptainer exec -B /gpfs01 rivet-pythia_main.sif bash
+apptainer exec -B /gpfs01 rivet-pythia.sif bash
 ```
 
 ## Compile + Local Run

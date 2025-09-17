@@ -34,16 +34,16 @@ if [[ -z "$APPTAINER_BIN" ]]; then
   exit 127
 fi
 
-IMG="/gpfs01/star/pwg/prozorov/dijets/pythiaTrees/rivet-pythia.sif"
+IMG="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/rivet-pythia.sif"
 
-EXECUTABLE="/gpfs01/star/pwg/prozorov/dijets/pythiaTrees/makeTree"
+EXECUTABLE="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/makeTree"
 
 if [[ ! -x "$EXECUTABLE" ]]; then
   echo "Error: executable '$EXECUTABLE' not found " >&2
   exit 1
 fi
 
-OUTDIR="/gpfs01/star/pwg/prozorov/dijets/pythiaTrees/output"
+OUTDIR="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/output"
 mkdir -p "$OUTDIR"
 
 PREFIX="pp200_"$CLUSTER"_"$PROC
