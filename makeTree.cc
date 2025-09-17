@@ -153,11 +153,9 @@ int main(int argc, char *argv[])
    // Jet branches (store up to 10 dijets)
 
    int nDijets = 0;
-   int lead, sub, lead_n_charged, sub_n_charged;
+   int lead_n_charged, sub_n_charged;
    float lead_pt, sub_pt, lead_eta, sub_eta, lead_phi, sub_phi, closeness;
 
-   t->Branch("lead_pt", &lead_pt, "lead_pt/F");
-   t->Branch("sub_pt", &sub_pt, "sub_pt/F");
    t->Branch("lead_eta", &lead_eta, "lead_eta/F");
    t->Branch("sub_eta", &sub_eta, "sub_eta/F");
    t->Branch("lead_phi", &lead_phi, "lead_phi/F");
@@ -270,15 +268,13 @@ int main(int argc, char *argv[])
          return n;
       };
 
+      nDijets = chosenPairs.size();
+
       for (const auto &pair : chosenPairs) {
 
          int nLeadCh = countCharged(jets[pair.lead]);
          int nSubleadCh = countCharged(jets[pair.sub]);
 
-         nDijets = chosenPairs.size();
-
-         lead = pair.lead;
-         sub = pair.sub;
          lead_pt = jets[pair.lead].pt();
          sub_pt = jets[pair.sub].pt();
          lead_eta = jets[pair.lead].eta();
