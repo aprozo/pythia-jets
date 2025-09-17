@@ -1,0 +1,9 @@
+*.root
+*.pcm
+*.d
+*.o
+*.so
+/submit/log/*
+/submit/condor.out
+makeTree
+rivet-pythia.sif
