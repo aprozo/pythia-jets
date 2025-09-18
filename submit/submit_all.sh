@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WORKDIR="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/submit"
-SUBMIT=$WORKDIR/condor.submit
-LIST=$WORKDIR/ptHatBins.list
+WORKDIR="/gpfs01/star/pwg/prozorov/dijets/pythia-jets"
 
-cd $WORKDIR
+SUBMIT=$WORKDIR/submit/condor.submit
+LIST=$WORKDIR/submit/ptHatBins.list
 
-mkdir -p $WORKDIR/log
+cd $WORKDIR/submit
+
+mkdir -p $WORKDIR/submit/log
 # cleaning up old logs
-rm -f $WORKDIR/log/pythia.*.log
-rm -f $WORKDIR/log/pythia.*.err
-rm -f $WORKDIR/log/pythia.*.out
+rm -f $WORKDIR/submit/log/pythia.*.log
+rm -f $WORKDIR/submit/log/pythia.*.err
+rm -f $WORKDIR/submit/log/pythia.*.out
 
 # sanity: show how many lines we'll submit
 N=$(grep -v '^\s*#' "$LIST" | grep -v '^\s*$' | wc -l | tr -d ' ')
@@ -39,19 +40,19 @@ done
 
 echo "Merging TTrees..."
 
-TREEDIR="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/output"
+TREEDIR=$WORKDIR/output
 
 i=0
 grep -v '^\s*#' "$LIST" | grep -v '^\s*$' | while read -r PTMIN PTMAX NEVT _; do
   i=$((i+1))
-  apptainer exec -B /gpfs01 /gpfs01/star/pwg/prozorov/dijets/pythia-jets/rivet-pythia.sif /usr/local/root/bin/hadd -f -j -k\
+  apptainer exec -B /gpfs01 $WORKDIR/rivet-pythia.sif /usr/local/root/bin/hadd -f -j -k\
    $TREEDIR/sum_pp200_ptHat_${PTMIN}_${PTMAX}.root $TREEDIR/pp200_*_*_pThat_${PTMIN}_${PTMAX}.root
 done
 
 echo "Merging TTrees done."
 
 echo "Running anaTrees..."
-cd /gpfs01/star/pwg/prozorov/dijets/pythia-jets
+cd $WORKDIR
 
-apptainer exec -B /gpfs01 /gpfs01/star/pwg/prozorov/dijets/pythia-jets/rivet-pythia.sif\
+apptainer exec -B /gpfs01 $WORKDIR/rivet-pythia.sif\
  /usr/local/root/bin/root -l -b -q  anaTrees/anaTrees.cpp+

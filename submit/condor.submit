@@ -2,12 +2,12 @@
 universe        = vanilla
 
 # Executable
-executable      = /gpfs01/star/pwg/prozorov/dijets/pythia-jets/submit/job.sh
+executable      = job.sh
 
 # Logs (make sure log/ exists)
-log             = /gpfs01/star/pwg/prozorov/dijets/pythia-jets/submit/log/pythia.$(ClusterId).log
-output          = /gpfs01/star/pwg/prozorov/dijets/pythia-jets/submit/log/pythia.$(ClusterId).$(ProcId).out
-error           = /gpfs01/star/pwg/prozorov/dijets/pythia-jets/submit/log/pythia.$(ClusterId).$(ProcId).err
+log             = log/pythia.$(ClusterId).log
+output          = log/pythia.$(ClusterId).$(ProcId).out
+error           = log/pythia.$(ClusterId).$(ProcId).err
 
 
 request_cpus    = 1

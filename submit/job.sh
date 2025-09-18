@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+WORKDIR="/gpfs01/star/pwg/prozorov/dijets/pythia-jets"
+
 # Arguments from condor:
 #   $1 = ptHatMin
 #   $2 = ptHatMax
@@ -34,16 +36,16 @@ if [[ -z "$APPTAINER_BIN" ]]; then
   exit 127
 fi
 
-IMG="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/rivet-pythia.sif"
+IMG=$WORKDIR/rivet-pythia.sif
 
-EXECUTABLE="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/makeTree"
+EXECUTABLE=$WORKDIR/makeTree
 
 if [[ ! -x "$EXECUTABLE" ]]; then
   echo "Error: executable '$EXECUTABLE' not found " >&2
   exit 1
 fi
 
-OUTDIR="/gpfs01/star/pwg/prozorov/dijets/pythia-jets/output"
+OUTDIR=$WORKDIR/output
 mkdir -p "$OUTDIR"
 
 PREFIX="pp200_"$CLUSTER"_"$PROC
