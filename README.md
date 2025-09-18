@@ -14,9 +14,12 @@ apptainer exec -B /gpfs01 rivet-pythia.sif bash
 ```
 
 ## Compile + Local Run
+
+Format for executable arguments : `pTHatMin pTHatMax|inf [nEvents=50000]`
+
 ```bash
 make
-./makeTree
+./makeTree 10 15 10000
 ```
 
 Parameters can be tuned in `makeTree.cc`
