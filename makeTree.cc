@@ -14,26 +14,49 @@
 using namespace Pythia8;
 
 struct DijetPair {
-   int lead;
+   int lead; // index in jet array
    int sub;
 
    double dphi;      // in [0, M_PI]
    double closeness; // = M_PI - dphi (smaller is better / closer to back-to-back)
-
-   double lead_pt;
-   double sub_pt;
-   double lead_eta;
-   double sub_eta;
-   double lead_phi;
-   double sub_phi;
-   int lead_n_charged;
-   int sub_n_charged;
 };
 
-inline double deltaPhi(double phi1, double phi2)
+double deltaPhi(double phi1, double phi2) // return value in (-PI, PI]
 {
-   // remainder wraps to (-π, π]; abs makes [0, π]
-   return std::abs(std::remainder(phi1 - phi2, 2.0 * M_PI));
+   double dphi = phi1 - phi2;
+   while (dphi > M_PI)
+      dphi -= 2 * M_PI;
+   while (dphi <= -M_PI)
+      dphi += 2 * M_PI;
+   return dphi;
+}
+
+double deltaR(double eta1, double phi1, double eta2, double phi2)
+{
+   const double dphi = deltaPhi(phi1, phi2);
+   const double deta = eta1 - eta2;
+   return std::sqrt(deta * deta + dphi * dphi);
+}
+
+// Count charged final-state particles in a cone of radius R around (eta0, phi0)
+template <class PartContainer>
+int countInCone(const PartContainer &parts, double eta0, double phi0, double R, double partPtMin, double partEtaMax)
+{
+   if (std::abs(eta0) > partEtaMax - R)
+      return 0; // require cone fully inside
+   int n = 0;
+   for (const auto &p : parts) {
+      const double pt = p.pt();
+      if (pt < partPtMin)
+         continue;
+      const double eta = p.eta();
+      if (std::abs(eta) > partEtaMax)
+         continue;
+      const double phi = p.phi();
+      if (deltaR(eta, phi, eta0, phi0) < R)
+         ++n;
+   }
+   return n;
 }
 
 static std::string trim_trailing_zeros(double x)
@@ -80,8 +103,8 @@ int main(int argc, char *argv[])
    std::string out = (argc > 5) ? argv[5] : "pp200";
 
    // jet parameter
-   const double R = 0.4;
-   const double jetEtaMax = 1.0 - R;
+   const double jetRadius = 0.4;
+   const double jetEtaMax = 1.0 - jetRadius;
    const double dPhiMin = 0.75 * M_PI; // back-to-back requirement
    const double jetPtMin = 3.0;
    // particle parameters
@@ -152,25 +175,22 @@ int main(int argc, char *argv[])
 
    // Jet branches (store up to 10 dijets)
 
-   int nDijets = 0;
    int lead_n_charged, sub_n_charged;
-   float lead_pt, sub_pt, lead_eta, sub_eta, lead_phi, sub_phi, closeness;
+   double lead_pt, sub_pt, lead_eta, sub_eta, lead_phi, sub_phi, closeness, background_mult_A, background_mult_B;
 
-   t->Branch("lead_eta", &lead_eta, "lead_eta/F");
-   t->Branch("sub_eta", &sub_eta, "sub_eta/F");
-   t->Branch("lead_phi", &lead_phi, "lead_phi/F");
-   t->Branch("sub_phi", &sub_phi, "sub_phi/F");
+   t->Branch("lead_pt", &lead_pt, "lead_pt/D");
+   t->Branch("sub_pt", &sub_pt, "sub_pt/D");
+   t->Branch("lead_eta", &lead_eta, "lead_eta/D");
+   t->Branch("sub_eta", &sub_eta, "sub_eta/D");
+   t->Branch("lead_phi", &lead_phi, "lead_phi/D");
+   t->Branch("sub_phi", &sub_phi, "sub_phi/D");
    t->Branch("lead_n_charged", &lead_n_charged, "lead_n_charged/I");
    t->Branch("sub_n_charged", &sub_n_charged, "sub_n_charged/I");
-   t->Branch("closeness", &closeness, "closeness/F");
+   t->Branch("background_mult_A", &background_mult_A, "background_mult_A/D");
+   t->Branch("background_mult_B", &background_mult_B, "background_mult_B/D");
+   t->Branch("closeness", &closeness, "closeness/D");
 
-   TH1D *hMultLead = new TH1D("multiplicityLeading", "Charged multiplicity of leading jet;N_{ch};Events", 50, 0, 50);
-   TH1D *hMultSublead =
-      new TH1D("multiplicitySubleading", "Charged multiplicity of subleading jet;N_{ch};Events", 50, 0, 50);
-   TH2D *hMultLeadVsSub = new TH2D(
-      "multLeadVsSublead", "N_{ch}^{lead} vs N_{ch}^{sublead};N_{ch}^{lead};N_{ch}^{sublead}", 50, 0, 50, 50, 0, 50);
-
-   fastjet::JetDefinition jetDef(fastjet::antikt_algorithm, R);
+   fastjet::JetDefinition jetDef(fastjet::antikt_algorithm, jetRadius);
 
    long long accepted = 0;
 
@@ -189,7 +209,7 @@ int main(int argc, char *argv[])
       for (int i = 0; i < pythia8.event.size(); ++i) {
          const auto &p = pythia8.event[i];
          // final-state, visible (no neutrinos), basic kinematic filter
-         if (!p.isFinal())
+         if (!p.isFinal() || !p.isVisible())
             continue;
          if (p.idAbs() == 12 || p.idAbs() == 14 || p.idAbs() == 16)
             continue;
@@ -211,7 +231,7 @@ int main(int argc, char *argv[])
       auto all_jets = fastjet::sorted_by_pt(cs.inclusive_jets());
       auto jets = select_both(all_jets);
       // Need at least two jets
-      if (jets.size() < 2)
+      if (jets.size() != 2)
          continue;
 
       accepted++;
@@ -223,6 +243,7 @@ int main(int argc, char *argv[])
          for (size_t j = i + 1; j < jets.size(); ++j) {
             double phi2 = jets[j].phi_std();
             double dphi12 = deltaPhi(phi1, phi2);
+            dphi12 = std::abs(dphi12); // make positive
 
             if (dphi12 < dPhiMin)
                continue;
@@ -268,26 +289,28 @@ int main(int argc, char *argv[])
          return n;
       };
 
-      nDijets = chosenPairs.size();
-
       for (const auto &pair : chosenPairs) {
 
-         int nLeadCh = countCharged(jets[pair.lead]);
-         int nSubleadCh = countCharged(jets[pair.sub]);
+         auto leadJet = jets[pair.lead];
+         auto subJet = jets[pair.sub];
 
-         lead_pt = jets[pair.lead].pt();
-         sub_pt = jets[pair.sub].pt();
-         lead_eta = jets[pair.lead].eta();
-         sub_eta = jets[pair.sub].eta();
-         lead_phi = jets[pair.lead].phi_std();
-         sub_phi = jets[pair.sub].phi_std();
-         lead_n_charged = nLeadCh;
-         sub_n_charged = nSubleadCh;
+         lead_n_charged = countCharged(leadJet);
+         sub_n_charged = countCharged(subJet);
+
+         lead_pt = leadJet.pt();
+         sub_pt = subJet.pt();
+         lead_eta = leadJet.eta();
+         sub_eta = subJet.eta();
+         lead_phi = leadJet.phi_std();
+         sub_phi = subJet.phi_std();
          closeness = pair.closeness;
 
-         hMultLead->Fill(nLeadCh);
-         hMultSublead->Fill(nSubleadCh);
-         hMultLeadVsSub->Fill(nLeadCh, nSubleadCh);
+         double phiA = deltaPhi(lead_phi, M_PI / 2);
+         double phiB = deltaPhi(lead_phi, -M_PI / 2);
+
+         background_mult_A = countInCone(parts, lead_eta, phiB, jetRadius, partPtMin, partEtaMax);
+         background_mult_B = countInCone(parts, lead_eta, phiA, jetRadius, partPtMin, partEtaMax);
+
          t->Fill();
       }
    }

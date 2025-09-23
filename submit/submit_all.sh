@@ -54,5 +54,5 @@ echo "Merging TTrees done."
 echo "Running anaTrees..."
 cd $WORKDIR
 
-apptainer exec -B /gpfs01 $WORKDIR/rivet-pythia.sif\
+apptainer exec -B /gpfs01 rivet-pythia.sif\
  /usr/local/root/bin/root -l -b -q  anaTrees/anaTrees.cpp+
