@@ -10,6 +10,8 @@
 #include "TTree.h"
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TRandom3.h"
+#include "TF1.h"
 
 using namespace Pythia8;
 
@@ -72,14 +74,26 @@ static std::string trim_trailing_zeros(double x)
    return s.empty() ? "0" : s;
 }
 
+bool isAcceptedTrack(double pt, TF1 &eff)
+{
+   if (pt > 30)
+      return false; // reject very high pt tracks
+
+   return gRandom->Rndm() < eff.Eval(pt);
+}
+
 int main(int argc, char *argv[])
 {
+   gRandom->SetSeed(0); // use random seed based on machine time
    if (argc < 3) {
       std::cerr << "Usage: " << argv[0]
                 << " pTHatMin pTHatMax|inf [nEvents=50000] [SEED=12345]"
                    " [OUTPREFIX=pp200_HardQCD]\n";
       return 1;
    }
+
+   TF1 eff("eff", "[0]*(1-exp(-pow(x/[1],[2])))", 0, 30);
+   eff.SetParameters(0.88, 0.25, 1.2); // eff_max, p0, n
 
    // Required: pTHatMin
    const double ptHatMin = std::stod(argv[1]);
@@ -217,6 +231,8 @@ int main(int argc, char *argv[])
             continue; // wide acceptance for clustering
          if (p.pT() < partPtMin)
             continue;
+         if (!isAcceptedTrack(p.pT(), eff))
+            continue; // simulate detector inefficiency
          fastjet::PseudoJet pj(p.px(), p.py(), p.pz(), p.e());
          pj.set_user_index(i); // <— keep Pythia index to recover charge later
          parts.push_back(pj);
@@ -231,7 +247,7 @@ int main(int argc, char *argv[])
       auto all_jets = fastjet::sorted_by_pt(cs.inclusive_jets());
       auto jets = select_both(all_jets);
       // Need at least two jets
-      if (jets.size() != 2)
+      if (jets.size() < 2)
          continue;
 
       accepted++;

@@ -8,9 +8,12 @@
 #include "TLatex.h"
 #include "TLegend.h"
 #include "TStyle.h"
+#include <TColor.h>
 #include <iostream>
 
 #include <vector>
+
+static const double balanceCut = 0.2;
 
 double getEntropy(TH1D *h)
 {
@@ -89,10 +92,45 @@ void drawLabel(TPad *pad, float x = 0.57, TString extra = "")
    latex->DrawLatex(x, 0.75, "|#eta|<0.6, anti-k_{T}, #it{R}=0.4");
    latex->DrawLatex(x, 0.70, "jet p_{t} > 3 GeV/c");
    latex->DrawLatex(x, 0.65, "p_{t,track}>0.15 GeV/c, |#eta_{track}|<1");
-   latex->DrawLatex(x, 0.60, ">1 dijet per event");
-   latex->DrawLatex(x, 0.55, "p_{t}^{sublead}/p_{t}^{lead} > 0.5");
+   latex->DrawLatex(x, 0.60, "1 dijet per event");
+   latex->DrawLatex(x, 0.55, Form("p_{t}^{sublead}/p_{t}^{lead} > %.1f", balanceCut));
    latex->DrawLatex(x, 0.50, "|#phi_{lead} - #phi_{sublead}| > 3#pi/4");
    latex->DrawLatex(x, 0.45, extra);
+}
+
+void drawProjectionsPt(TCanvas *can, TH2D *h)
+{
+   vector<int> colors = {2000, 2001, 2002, 2004, 2005, 2006, 2007};
+   TLegend *leg2 = new TLegend(0.75, 0.3, 0.95, 0.7);
+   leg2->SetBorderSize(0);
+   can->Clear();
+   can->SetName(TString("draw_projections_") + h->GetName());
+   can->SetLogy(1);
+   int counter = 0;
+   int step = h->GetNbinsX() / 5;
+   for (int i = 1; i <= h->GetNbinsX() - step; i += step) {
+
+      int binMax = i + step - 1;
+      if (binMax > h->GetNbinsX())
+         binMax = h->GetNbinsX();
+      TH1D *proj = h->ProjectionY(Form("proj_%d_%d", i, binMax), i, binMax);
+      proj->GetYaxis()->SetTitle("Normalized entries");
+      proj->SetTitle("");
+      proj->SetLineColor(colors[counter]);
+      proj->SetMarkerColor(colors[counter]);
+      proj->SetMarkerStyle(20);
+      proj->SetMarkerSize(0.6);
+      proj->GetYaxis()->SetRangeUser(1e-4, 10);
+      proj->Rebin(4);
+      proj->DrawNormalized(i == 1 ? "E1" : "same E1");
+
+      leg2->AddEntry(proj,
+                     TString(h->GetXaxis()->GetTitle()) +
+                        Form("%2.f - %2.f GeV/c", h->GetXaxis()->GetBinLowEdge(i), h->GetXaxis()->GetBinUpEdge(binMax)),
+                     "lp");
+      counter++;
+   }
+   leg2->Draw();
 }
 
 // pp200_pThat_11_15.root  pp200_pThat_2_3.root    pp200_pThat_35_45.root  pp200_pThat_55_inf.root pp200_pThat_9_11.root
@@ -125,6 +163,9 @@ void anaTrees()
    for (size_t i = 0; i < ptHatBins.size(); ++i) {
       hStatistics->GetXaxis()->SetBinLabel(i + 1, ptHatBins[i]);
    }
+
+   TH1D *hAcceptedEvents = (TH1D *)hStatistics->Clone("hAcceptedEvents");
+   hAcceptedEvents->SetTitle("nAcceptedEvents; ptHat range;nAcceptedEvents");
 
    const int nPtBins = 20;
    const double ptMin = 0;
@@ -165,6 +206,11 @@ void anaTrees()
                "Background multiplicity; N_{ch}^{A};N_{ch}^{B};p_{t}^{lead} - p_{t}^{sublead} (GeV/c); d#sigma/dN [mb]",
                nMultBins, multMin, multMax, nMultBins, multMin, multMax, nPtBins, ptMin, ptMax);
 
+   // QA histograms
+   TH1D *hPtLeSub = new TH1D("hPtLeSub",
+                             "p_{t}^{lead} - p_{t}^{sublead}; p_{t}^{lead} - p_{t}^{sublead} (GeV/c); "
+                             "d#sigma/dp_{t} [mb]",
+                             nPtBins, ptMin, ptMax);
    TH1D *hPtAll =
       new TH1D("hPtAll", "All Jet p_{t}; p_{t} (GeV/c); d^{2}#sigma/(d#eta dp_{t}) [mb]", nPtBins, ptMin, ptMax);
    TH1D *hPtLead =
@@ -176,11 +222,20 @@ void anaTrees()
       new TH2D("hBalanceVsPt",
                "p_{t}^{sublead}/p_{t}^{lead} vs p_{t}^{lead}; p_{t}^{lead} (GeV/c); p_{t}^{sublead}/p_{t}^{lead}", 100,
                ptMin, ptMax, 50, 0, 1);
+   TH2D *hBalanceVsLeSub = new TH2D(
+      "hBalanceVsLeSub",
+      "p_{t}^{sublead}/p_{t}^{lead} vs p_{t}^{lead} - p_{t}^{sublead}; p_{t}^{lead} - p_{t}^{sublead} (GeV/c); "
+      "p_{t}^{sublead}/p_{t}^{lead}",
+      100, ptMin, ptMax, 50, 0, 1);
 
-   TH1D *hPtLeSub = new TH1D("hPtLeSub",
-                             "p_{t}^{lead} - p_{t}^{sublead}; p_{t}^{lead} - p_{t}^{sublead} (GeV/c); "
-                             "d#sigma/dp_{t} [mb]",
-                             nPtBins, ptMin, ptMax);
+   TH1D *hCloseness = new TH1D("hCloseness", "Closeness; |#phi_{lead} - #phi_{sublead} - #pi/2|", 50, 0, 1);
+   TH2D *hClosenessVsPt = new TH2D(
+      "hClosenessVsPt", "Closeness vs p_{t}^{lead}; p_{t}^{lead} (GeV/c); |#phi_{lead} - #phi_{sublead}- #pi/2|", 100,
+      ptMin, ptMax, 100, 0, 1);
+   TH2D *hClosenessVsLeSub = new TH2D("hClosenessVsLeSub",
+                                      "Closeness vs p_{t}^{lead} - p_{t}^{sublead}; p_{t}^{lead} - p_{t}^{sublead} "
+                                      "(GeV/c); |#phi_{lead} - #phi_{sublead}- #pi/2|",
+                                      100, ptMin, ptMax, 100, 0, 1);
 
    TH1D *stats;
    vector<TString> statNames = {"nEvents", "nAccepted", "ptHatMin", "ptHatMax", "sigmaGen_mb", "sigmaErr_mb"};
@@ -205,6 +260,7 @@ void anaTrees()
       totalNevents += stats->GetBinContent(1);
       totalXsec += stats->GetBinContent(5); // mb
       hStatistics->SetBinContent(hStatistics->GetXaxis()->FindBin(bin), stats->GetBinContent(1));
+      hAcceptedEvents->SetBinContent(hAcceptedEvents->GetXaxis()->FindBin(bin), stats->GetBinContent(2));
       f->Close();
    }
    cout << "Total cross section from all ptHat bins: " << totalXsec << " mb" << endl;
@@ -235,8 +291,8 @@ void anaTrees()
       ptHatMax = TString(bin(bin.Index("_") + 1, bin.Length())).Atof();
 
       double weight = xsec / nEvents;
-      cout << "nEvents = " << nEvents / 1e6 << "M, xsec = " << xsec << " mb, ptHat " << ptHatMin << "-" << ptHatMax
-           << endl;
+      cout << "nEvents = " << nEvents / 1e6 << "M, accepted = " << stats->GetBinContent(2) / 1e6 << "M, xsec = " << xsec
+           << " mb, ptHat " << ptHatMin << "-" << ptHatMax << endl;
       TTree *t = (TTree *)f->Get("events");
       t->SetBranchAddress("lead_pt", &lead_pt);
       t->SetBranchAddress("sub_pt", &sub_pt);
@@ -256,7 +312,13 @@ void anaTrees()
          double balance = sub_pt / lead_pt;
          hBalance->Fill(balance, weight);
          hBalanceVsPt->Fill(lead_pt, balance, weight);
-         if (balance < 0.5)
+         hBalanceVsLeSub->Fill(lead_pt - sub_pt, balance, weight);
+
+         hCloseness->Fill(closeness, weight);
+         hClosenessVsPt->Fill(lead_pt, closeness, weight);
+         hClosenessVsLeSub->Fill(lead_pt - sub_pt, closeness, weight);
+
+         if (balance < balanceCut)
             continue; // remove unbalanced dijets
 
          hMult3D->Fill(lead_n_charged, sub_n_charged, lead_pt, weight);
@@ -291,45 +353,93 @@ void anaTrees()
    latex->SetTextSize(0.04);
    latex->SetTextFont(42);
 
+   new TColor(2000, (255. / 255.), (89. / 255.), (74. / 255.));   // red-ish
+   new TColor(2001, (25. / 255.), (170. / 255.), (25. / 255.));   // green-ish
+   new TColor(2002, (66. / 255.), (98. / 255.), (255. / 255.));   // blue-ish
+   new TColor(2001, (153. / 255.), (0. / 255.), (153. / 255.));   // magenta-ish
+   new TColor(2004, (255. / 255.), (166. / 255.), (33. / 255.));  // yellow-ish
+   new TColor(2005, (0. / 255.), (170. / 255.), (255. / 255.));   // azur-ish
+   new TColor(2006, (204. / 255.), (153. / 255.), (255. / 255.)); // violet-ish
+   new TColor(2007, (107. / 255.), (142. / 255.), (35. / 255.));  // olive
+   new TColor(2008, (100. / 255.), (149. / 255.),
+              (237. / 255.));                                   // corn flower blue
+   new TColor(2009, (255. / 255.), (69. / 255.), (0. / 255.));  // orange red
+   new TColor(2010, (0. / 255.), (128. / 255.), (128. / 255.)); // teal
+   new TColor(2011, (176. / 255.), (196. / 255.),
+              (222. / 255.));                                   // light steel blue
+   new TColor(2012, (255. / 255.), (215. / 255.), (0. / 255.)); // gold-ish
+
+   new TColor(3000, (251. / 255.), (228. / 255.), (216. / 255.));
+   new TColor(3001, (223. / 255.), (182. / 255.), (178. / 255.));
+   new TColor(3002, (133. / 255.), (79. / 255.), (108. / 255.));
+   new TColor(3003, (82. / 255.), (43. / 255.), (91. / 255.));
+   new TColor(3004, (43. / 255.), (18. / 255.), (76. / 255.));
+   new TColor(3005, (25. / 255.), (0. / 255.), (25. / 255.));
+   new TColor(3006, (49. / 255.), (61. / 255.), (90. / 255.));
+
    can->SaveAs("anaTrees.pdf[");
 
    outFile->cd();
    can->SetLogy();
    can->SetName("draw_ptAll");
-   hPtAll->Draw();
+   hPtAll->SetLineColor(2002);
+   hPtAll->SetMarkerColor(2002);
+   hPtAll->Draw("E1");
    drawLabel(can);
    can->Write();
    can->SaveAs("anaTrees.pdf");
 
    can->SetLogy();
    can->SetName("draw_ptLeSub");
-   hPtLeSub->Draw();
+   hPtLeSub->SetLineColor(2002);
+   hPtLeSub->SetMarkerColor(2002);
+   hPtLeSub->Draw("E1");
    drawLabel(can);
    can->Write();
    can->SaveAs("anaTrees.pdf");
 
    can->SetLogy(0);
 
-   can->SetLogz();
+   can->SetLogz(1);
+
    can->SetName("draw_MultLeadVsSub");
-   hMultLeadVsSub->Draw("COLZ");
+   hMultLeadVsSub->DrawNormalized("colz");
+   drawLabel(can, 0.53, "p_{t}^{lead} > 70 GeV/c");
+   can->Write();
+   can->SaveAs("anaTrees.pdf");
+
+   can->SetName("draw_MultLead");
+   hMultLead->SetLineColor(2002);
+   hMultLead->SetMarkerColor(2002);
+   hMultLead->DrawNormalized("E1");
+   drawLabel(can, 0.53, "p_{t}^{lead} > 70 GeV/c");
+   can->Write();
+   can->SaveAs("anaTrees.pdf");
+
+   can->SetName("draw_MultSublead");
+   hMultSublead->SetLineColor(2002);
+   hMultSublead->SetMarkerColor(2002);
+   hMultSublead->DrawNormalized("E1");
    drawLabel(can, 0.53, "p_{t}^{lead} > 70 GeV/c");
    can->Write();
    can->SaveAs("anaTrees.pdf");
 
    /// COVARIANCE
-   covVsPt->SetLineColor(kBlue);
-   covVsPt->SetMarkerColor(kBlue);
+   covVsPt->SetLineWidth(2);
+   covVsPt->SetLineColor(2002);
+   covVsPt->SetMarkerColor(2002);
+   covVsPt->GetYaxis()->SetRangeUser(-0.1, 1.6);
    covVsPt->Draw("E1");
+   backgroundCovVsPt->SetLineWidth(2);
+   backgroundCovVsPt->SetLineColor(2000);
+   backgroundCovVsPt->SetMarkerColor(2000);
 
-   backgroundCovVsPt->SetLineColor(kRed);
-   backgroundCovVsPt->SetMarkerColor(kRed);
    backgroundCovVsPt->Draw("same E1");
 
    TH1D *subtractedCovVsPt = (TH1D *)covVsPt->Clone("subtractedCovVsPt");
    subtractedCovVsPt->Add(backgroundCovVsPt, -1);
    subtractedCovVsPt->GetZaxis()->SetTitle("COV(N_{ch}^{lead},N_{ch}^{sublead}) - COV(UE_{A},UE_{B})");
-
+   subtractedCovVsPt->SetLineWidth(2);
    subtractedCovVsPt->SetLineColor(kBlack);
    subtractedCovVsPt->SetMarkerColor(kBlack);
    subtractedCovVsPt->Draw("same E1");
@@ -348,12 +458,14 @@ void anaTrees()
 
    /// leSub
    can->Clear();
-   covVsLeSub->SetLineColor(kBlue);
-   covVsLeSub->SetMarkerColor(kBlue);
+   covVsLeSub->SetLineWidth(2);
+   covVsLeSub->SetLineColor(2002);
+   covVsLeSub->SetMarkerColor(2002);
+   covVsLeSub->GetYaxis()->SetRangeUser(-0.1, 1.6);
    covVsLeSub->Draw("E1");
 
-   backgroundCovVsLeSub->SetLineColor(kRed);
-   backgroundCovVsLeSub->SetMarkerColor(kRed);
+   backgroundCovVsLeSub->SetLineColor(2000);
+   backgroundCovVsLeSub->SetMarkerColor(2000);
    backgroundCovVsLeSub->Draw("same E1");
 
    TH1D *subtractedCovVsLeSub = (TH1D *)covVsLeSub->Clone("subtractedCovVsLeSub");
@@ -374,7 +486,22 @@ void anaTrees()
    can->Write();
    can->SaveAs("anaTrees.pdf");
 
-   //// end
+   // make projections
+   drawProjectionsPt(can, hBalanceVsPt);
+   can->Write();
+   can->SaveAs("anaTrees.pdf");
+
+   drawProjectionsPt(can, hBalanceVsLeSub);
+   can->Write();
+   can->SaveAs("anaTrees.pdf");
+
+   drawProjectionsPt(can, hClosenessVsPt);
+   can->Write();
+   can->SaveAs("anaTrees.pdf");
+
+   drawProjectionsPt(can, hClosenessVsLeSub);
+   can->Write();
+   can->SaveAs("anaTrees.pdf");
 
    can->SaveAs("anaTrees.pdf]");
 
