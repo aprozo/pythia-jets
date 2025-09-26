@@ -225,6 +225,9 @@ int main(int argc, char *argv[])
          // final-state, visible (no neutrinos), basic kinematic filter
          if (!p.isFinal() || !p.isVisible())
             continue;
+         if (!p.isCharged())
+            continue; // charged only
+         // exclude neutrinos (should be covered by isVisible())
          if (p.idAbs() == 12 || p.idAbs() == 14 || p.idAbs() == 16)
             continue;
          if (std::abs(p.eta()) > partEtaMax)
