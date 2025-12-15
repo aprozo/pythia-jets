@@ -28,7 +28,7 @@ LDFLAGS  := $(PY8LIBS) $(FJLIBS) $(ROOTLIBS)
 
 all: makeTree
 
-makeTree: makeTree.cc
+makeTree: makeTreeEBC.cc
 	$(CXX) $(CXXFLAGS) $< $(LDFLAGS) -o $@
 
 clean:
