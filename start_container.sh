@@ -1,3 +1,3 @@
 #!/bin/bash
 
-apptainer exec -B /gpfs01 rivet-pythia.sif bash
+apptainer exec rivet-pythia.sif bash

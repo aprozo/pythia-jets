@@ -28,7 +28,7 @@ LDFLAGS  := $(PY8LIBS) $(FJLIBS) $(ROOTLIBS)
 
 all: makeTree
 
-makeTree: makeTreeEBC.cc
+makeTree: embedSpecialDijets.cpp
 	$(CXX) $(CXXFLAGS) $< $(LDFLAGS) -o $@
 
 clean:
